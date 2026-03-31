@@ -1,0 +1,46 @@
+# Dependencies
+node_modules
+.pnp
+.pnp.js
+
+# Next.js
+.next
+out
+build
+dist
+
+# Env (nunca commitar secrets)
+.env
+.env*.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Debug / logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# TypeScript
+*.tsbuildinfo
+
+# OS / IDE
+.DS_Store
+*.pem
+.idea
+.vscode/*
+!.vscode/extensions.json
+
+# Vercel
+.vercel
+
+# Test / coverage
+coverage
+.turbo
+
+# Cursor / local (opcional)
+.cursor
+
+# Exportações n8n com metadados sensíveis (credenciais, webhooks)
+*Referência de Nodes*.json
