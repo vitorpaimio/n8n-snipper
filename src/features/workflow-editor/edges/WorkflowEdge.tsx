@@ -87,7 +87,7 @@ export function WorkflowEdge({
                 onClick={() => {
                   window.dispatchEvent(
                     new CustomEvent("workflow:edge-plus", {
-                      detail: { sourceId: source, category },
+                      detail: { sourceId: source, category, sourceHandleId: sourceHandleId ?? null },
                     }),
                   );
                 }}

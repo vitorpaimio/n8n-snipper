@@ -378,7 +378,7 @@ a {
   transition: opacity 100ms ease;
 }
 
-.workflow-handle-plus:hover .workflow-handle-plus-rect {
+.workflow-handle-plus:hover .workflow-branch-plus-rect {
   stroke: rgba(255, 255, 255, 0.35);
   fill: var(--n8n-surface-hover);
 }
@@ -725,6 +725,13 @@ a {
   transform: translate(-50%, -50%) !important;
 }
 
+.workflow-node-card--ai-sub .workflow-handle--ai-sub-source {
+  top: 50% !important;
+  right: 0 !important;
+  left: auto !important;
+  transform: translate(50%, -50%) !important;
+}
+
 .workflow-node-shell--ai-sub .workflow-node-meta {
   position: relative;
   top: auto;
@@ -743,6 +750,85 @@ a {
 .workflow-node-shell--ai-sub[data-node-state="selected"] .workflow-node-card--ai-sub {
   border-color: var(--n8n-state-selected);
   box-shadow: var(--n8n-shadow-selected);
+}
+
+/* ── Nó IF: uma entrada, duas saídas (true / false) ── */
+
+.workflow-node-card--if {
+  position: relative;
+  overflow: visible;
+}
+
+.workflow-node-card--if .workflow-handle--if-true {
+  top: 25% !important;
+  right: 0 !important;
+  left: auto !important;
+  transform: translate(50%, -50%) !important;
+}
+
+.workflow-node-card--if .workflow-handle--if-false {
+  top: 75% !important;
+  right: 0 !important;
+  left: auto !important;
+  transform: translate(50%, -50%) !important;
+}
+
+/* ── Switch Node ── */
+
+.workflow-node-card--switch {
+  position: relative;
+  overflow: visible;
+}
+
+.workflow-handle--switch {
+  right: 0 !important;
+  left: auto !important;
+  transform: translate(50%, -50%) !important;
+}
+
+.workflow-switch-output {
+  position: absolute;
+  left: calc(100% + 10px);
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  pointer-events: none;
+  z-index: 6;
+}
+
+.workflow-switch-output-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: rgba(255, 255, 255, 0.5);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+  user-select: none;
+  line-height: 1;
+  flex-shrink: 0;
+  text-align: left;
+}
+
+.workflow-switch-output-plus {
+  pointer-events: auto;
+  opacity: 0.7;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  transition: opacity 100ms ease;
+}
+
+.workflow-node-shell[data-node-state="hover"] .workflow-switch-output-plus,
+.workflow-node-shell[data-node-state="selected"] .workflow-switch-output-plus {
+  opacity: 1;
+}
+
+.workflow-switch-output-plus:hover .workflow-branch-plus-rect {
+  stroke: rgba(255, 255, 255, 0.35);
+  fill: var(--n8n-surface-hover);
 }
 
 /* ── Execution Badge (check / X on node corner) ── */
@@ -1524,6 +1610,88 @@ a {
 
 .node-edit-modal-input:focus {
   border-color: var(--n8n-state-selected);
+}
+
+.node-edit-modal-hint {
+  margin: -4px 0 4px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--n8n-text-muted);
+}
+
+.node-edit-modal-radio-row {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.node-edit-modal-radio {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--n8n-text-primary);
+  cursor: pointer;
+}
+
+.node-edit-modal-radio input {
+  accent-color: var(--n8n-state-selected);
+}
+
+.node-edit-modal-radio-col {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.node-edit-modal-stepper {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.node-edit-modal-stepper-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  background: var(--n8n-surface-alt);
+  color: var(--n8n-text-primary);
+  font-size: 16px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.node-edit-modal-stepper-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.node-edit-modal-stepper-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.node-edit-modal-stepper-value {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--n8n-text-primary);
+  min-width: 20px;
+  text-align: center;
+}
+
+.node-edit-modal-switch-labels {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.node-edit-modal-input--sm {
+  padding: 5px 8px;
+  font-size: 12px;
 }
 
 .node-edit-modal-toggle-row {

@@ -1,5 +1,6 @@
 import { allNodeTemplates, type WorkflowConnectionKind } from "@/workflow-kit";
 
+import { AI_SUB_TOP_TARGET_HANDLE } from "../agent-tool-subgraph";
 import {
   edgeFromSnapshot,
   type EdgeSnapshot,
@@ -21,6 +22,10 @@ type NodeSnapshot = {
   disabled?: boolean;
   simulateError?: boolean;
   outputLabel?: string;
+  ifBranchOutcome?: "true" | "false";
+  switchOutputCount?: number;
+  switchOutputLabels?: string[];
+  switchActiveOutput?: number;
   actionKey?: string;
   actionValue?: string;
 };
@@ -46,6 +51,16 @@ function nodeToSnapshot(n: WorkflowCanvasNode): NodeSnapshot {
     ...(n.data.disabled ? { disabled: true } : {}),
     ...(n.data.simulateError ? { simulateError: true } : {}),
     ...(n.data.outputLabel ? { outputLabel: n.data.outputLabel } : {}),
+    ...(n.data.templateId === "ifNode"
+      ? { ifBranchOutcome: n.data.ifBranchOutcome === "false" ? "false" : "true" }
+      : {}),
+    ...(n.data.templateId === "switchNode"
+      ? {
+          switchOutputCount: n.data.switchOutputCount ?? 2,
+          switchOutputLabels: n.data.switchOutputLabels ?? ["0", "1"],
+          switchActiveOutput: n.data.switchActiveOutput ?? 0,
+        }
+      : {}),
     ...(n.data.actionKey ? { actionKey: n.data.actionKey } : {}),
     ...(n.data.actionValue ? { actionValue: n.data.actionValue } : {}),
   };
@@ -153,6 +168,16 @@ export function loadSession(): {
         ...(snap.disabled ? { disabled: true } : {}),
         ...(snap.simulateError ? { simulateError: true } : {}),
         ...(snap.outputLabel ? { outputLabel: snap.outputLabel } : {}),
+        ...(snap.templateId === "ifNode"
+          ? { ifBranchOutcome: snap.ifBranchOutcome === "false" ? "false" : "true" }
+          : {}),
+        ...(snap.templateId === "switchNode"
+          ? {
+              switchOutputCount: snap.switchOutputCount ?? 2,
+              switchOutputLabels: snap.switchOutputLabels ?? ["0", "1"],
+              switchActiveOutput: snap.switchActiveOutput ?? 0,
+            }
+          : {}),
         ...(snap.actionKey ? { actionKey: snap.actionKey } : {}),
         ...(snap.actionValue ? { actionValue: snap.actionValue } : {}),
       },
@@ -173,13 +198,17 @@ export function loadSession(): {
       continue;
     }
 
+    const rawTh = snap.targetHandle ?? null;
+    const targetHandle =
+      rawTh === "main-sub-left" ? AI_SUB_TOP_TARGET_HANDLE : rawTh;
+
     edges.push(
       edgeFromSnapshot({
         id: snap.id,
         source: snap.source,
         target: snap.target,
         sourceHandle: snap.sourceHandle ?? null,
-        targetHandle: snap.targetHandle ?? null,
+        targetHandle,
         kind: snap.kind,
       }),
     );

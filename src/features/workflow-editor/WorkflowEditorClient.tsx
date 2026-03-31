@@ -33,6 +33,7 @@ import {
   buildNodeFromTemplate,
   resolveTemplate,
 } from "./mappers/workflow-reactflow-mapper";
+import { AI_SUB_TOP_TARGET_HANDLE, collectAgentToolChainNodeIds } from "./agent-tool-subgraph";
 import { WorkflowNodeCard } from "./nodes/WorkflowNodeCard";
 import type { WorkflowCanvasEdge, WorkflowCanvasNode } from "./types";
 import { useWorkflowExecution } from "./hooks/useWorkflowExecution";
@@ -83,6 +84,7 @@ function WorkflowEditorInner() {
   const [creatorCategory, setCreatorCategory] = useState<import("@/workflow-kit").NodeCreatorCategoryId | undefined>(undefined);
   const [selectedTriggerId, setSelectedTriggerId] = useState<string | null>(null);
   const [connectFromNodeId, setConnectFromNodeId] = useState<string | null>(null);
+  const [connectFromHandleId, setConnectFromHandleId] = useState<string | null>(null);
   const [editModalNodeId, setEditModalNodeId] = useState<string | null>(null);
 
   const { isRunning, startExecution, stopExecution } = useWorkflowExecution({
@@ -126,6 +128,8 @@ function WorkflowEditorInner() {
       const mainEdge = buildMainEdge({
         source: connection.source,
         target: connection.target,
+        sourceHandle: connection.sourceHandle,
+        targetHandle: connection.targetHandle,
       });
       setEdges((currentEdges) => addEdge(mainEdge, currentEdges));
     },
@@ -139,6 +143,8 @@ function WorkflowEditorInner() {
     tool: "agent-tool",
   };
 
+  const AI_SUB_TEMPLATE_TYPES = new Set(["chatModel", "memory", "tool", "communication"]);
+
   const onAddNode = useCallback(
     (
       templateId: NodeTemplateId,
@@ -151,6 +157,14 @@ function WorkflowEditorInner() {
 
       const sourceId = connectFromNodeId;
       const isAiSub = creatorCategory && AI_SUBPORT_CATEGORIES.has(creatorCategory);
+      const addedTemplate = resolveTemplate(templateId);
+      const sourceInToolChain = sourceId
+        ? collectAgentToolChainNodeIds(edges, nodes).has(sourceId)
+        : false;
+      const mainEdgeTargetHandle =
+        sourceInToolChain && addedTemplate && AI_SUB_TEMPLATE_TYPES.has(addedTemplate.type)
+          ? AI_SUB_TOP_TARGET_HANDLE
+          : undefined;
 
       setNodes((currentNodes) => {
         let position: { x: number; y: number };
@@ -180,20 +194,27 @@ function WorkflowEditorInner() {
           const edge = buildAiSubEdge({ source: sourceId, target: newId, sourceHandle });
           setEdges((currentEdges) => addEdge(edge, currentEdges));
         } else {
-          const edge = buildMainEdge({ source: sourceId, target: newId });
+          const edge = buildMainEdge({
+            source: sourceId,
+            target: newId,
+            ...(connectFromHandleId ? { sourceHandle: connectFromHandleId } : {}),
+            ...(mainEdgeTargetHandle ? { targetHandle: mainEdgeTargetHandle } : {}),
+          });
           setEdges((currentEdges) => addEdge(edge, currentEdges));
         }
       }
 
       setConnectFromNodeId(null);
+      setConnectFromHandleId(null);
       setCreatorCategory(undefined);
     },
-    [setNodes, setEdges, connectFromNodeId, creatorCategory],
+    [setNodes, setEdges, connectFromNodeId, connectFromHandleId, creatorCategory, edges, nodes],
   );
 
   const onPlusClick = useCallback(
-    (nodeId: string, subportCategory?: string) => {
+    (nodeId: string, subportCategory?: string, sourceHandleId?: string) => {
       setConnectFromNodeId(nodeId);
+      setConnectFromHandleId(sourceHandleId ?? null);
       setCreatorCategory(subportCategory as import("@/workflow-kit").NodeCreatorCategoryId | undefined);
       setCreatorOpen(true);
     },
@@ -202,8 +223,13 @@ function WorkflowEditorInner() {
 
   useEffect(() => {
     function handleEdgePlus(e: Event) {
-      const { sourceId, category } = (e as CustomEvent).detail;
+      const { sourceId, category, sourceHandleId } = (e as CustomEvent).detail as {
+        sourceId?: string | null;
+        category?: string;
+        sourceHandleId?: string | null;
+      };
       setConnectFromNodeId(sourceId ?? null);
+      setConnectFromHandleId(sourceHandleId ?? null);
       setCreatorCategory(category as import("@/workflow-kit").NodeCreatorCategoryId | undefined);
       setCreatorOpen(true);
     }
@@ -236,7 +262,19 @@ function WorkflowEditorInner() {
   );
 
   const onUpdateNodeData = useCallback(
-    (nodeId: string, patch: { title?: string; actionKey?: string; actionValue?: string; simulateError?: boolean }) => {
+    (
+      nodeId: string,
+      patch: {
+        title?: string;
+        actionKey?: string;
+        actionValue?: string;
+        simulateError?: boolean;
+        ifBranchOutcome?: "true" | "false";
+        switchOutputCount?: number;
+        switchOutputLabels?: string[];
+        switchActiveOutput?: number;
+      },
+    ) => {
       setNodes((nds) =>
         nds.map((n) => {
           if (n.id !== nodeId) return n;
@@ -258,6 +296,10 @@ function WorkflowEditorInner() {
               actionValue,
               description,
               ...(patch.simulateError !== undefined ? { simulateError: patch.simulateError } : {}),
+              ...(patch.ifBranchOutcome !== undefined ? { ifBranchOutcome: patch.ifBranchOutcome } : {}),
+              ...(patch.switchOutputCount !== undefined ? { switchOutputCount: patch.switchOutputCount } : {}),
+              ...(patch.switchOutputLabels !== undefined ? { switchOutputLabels: patch.switchOutputLabels } : {}),
+              ...(patch.switchActiveOutput !== undefined ? { switchActiveOutput: patch.switchActiveOutput } : {}),
             },
           };
         }),
@@ -284,6 +326,7 @@ function WorkflowEditorInner() {
     clearSession();
     setEditModalNodeId(null);
     setConnectFromNodeId(null);
+    setConnectFromHandleId(null);
     setSelectedTriggerId(null);
   }, [stopExecution, setNodes, setEdges]);
 
@@ -422,7 +465,12 @@ function WorkflowEditorInner() {
 
             <NodeCreatorPanel
               open={creatorOpen}
-              onClose={() => { setCreatorOpen(false); setConnectFromNodeId(null); setCreatorCategory(undefined); }}
+              onClose={() => {
+                setCreatorOpen(false);
+                setConnectFromNodeId(null);
+                setConnectFromHandleId(null);
+                setCreatorCategory(undefined);
+              }}
               onAddNode={onAddNode}
               initialCategory={creatorCategory}
             />

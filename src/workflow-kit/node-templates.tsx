@@ -8,7 +8,6 @@ import {
   CircleCheck,
   Clock,
   Filter,
-  GitFork,
   ListChecks,
   Loader2,
   MessageCircle,
@@ -92,6 +91,41 @@ import {
   IconOpenRouter,
   IconXata,
 } from "./node-icons";
+
+/** IF: uma entrada à esquerda, ramificação horizontal “‑<” (fluxo da esquerda para a direita). */
+function IconIfMapSigns({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="#10b981"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M12 13v8m0-18v3M4 6a1 1 0 0 0-1 1v5a1 1 0 0 0 1 1h13a2 2 0 0 0 1.152-.365l3.424-2.317a1 1 0 0 0 0-1.635l-3.424-2.318A2 2 0 0 0 17 6z" />
+    </svg>
+  );
+}
+
+function IconSwitchMapSigns({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="#60a5fa"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M12 13v8m0-18v3M4 6a1 1 0 0 0-1 1v5a1 1 0 0 0 1 1h13a2 2 0 0 0 1.152-.365l3.424-2.317a1 1 0 0 0 0-1.635l-3.424-2.318A2 2 0 0 0 17 6z" />
+    </svg>
+  );
+}
 
 function withSpin(
   Icon: ComponentType<{ className?: string }>,
@@ -226,8 +260,8 @@ const nodeTemplatesInternal: NodeTemplate[] = [
   { id: "mcp", type: "ai", title: "MCP", description: "Model Context Protocol", icon: IconMCP, color: "slate" },
   { id: "mistralAi", type: "ai", title: "Mistral AI", description: "Mistral", icon: IconMistralAI, color: "orange" },
 
-  { id: "switchNode", type: "condition", title: "Switch", description: "mode: Rules", icon: SplitSquareVertical, color: "rose" },
-  { id: "ifNode", type: "condition", title: "IF", description: "Encaminhar itens em ramos verdadeiro/falso", icon: GitFork, color: "amber" },
+  { id: "switchNode", type: "condition", title: "Switch", description: "mode: Rules", icon: IconSwitchMapSigns, color: "blue" },
+  { id: "ifNode", type: "condition", title: "IF", description: "Encaminhar itens em ramos verdadeiro/falso", icon: IconIfMapSigns, color: "green" },
 
   { id: "whatsapp", type: "communication", title: "WhatsApp", description: "message: send", icon: IconWhatsApp, color: "green" },
   { id: "gmail", type: "communication", title: "Gmail", description: "send: message", icon: IconGmail, color: "red" },

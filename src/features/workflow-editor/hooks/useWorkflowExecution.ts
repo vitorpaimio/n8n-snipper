@@ -1,4 +1,7 @@
 import { useCallback, useRef, useState } from "react";
+import { collectAgentToolChainNodeIds, expandOrderedToolsFromAgent } from "../agent-tool-subgraph";
+import { IF_FALSE_HANDLE_ID, IF_TRUE_HANDLE_ID } from "../if-node";
+import { switchHandleId } from "../switch-node";
 import type { WorkflowCanvasEdge, WorkflowCanvasNode, NodeVisualState } from "../types";
 
 type SetNodes = React.Dispatch<React.SetStateAction<WorkflowCanvasNode[]>>;
@@ -25,16 +28,61 @@ const HANDLE_TO_ROLE: Record<string, keyof AiAgentSubNodes> = {
 
 const AI_SUB_KINDS = new Set(["chatModel", "memory", "tool"]);
 
-function getAiSubNodes(agentId: string, edges: WorkflowCanvasEdge[]): AiAgentSubNodes {
+/** Destinos de arestas ai (sub-nós do agente); inclui apps na porta Tool com kind ex.: communication. */
+function targetsOfAiEdges(edges: WorkflowCanvasEdge[]): Set<string> {
+  const s = new Set<string>();
+  for (const e of edges) {
+    if (e.data?.kind === "ai") s.add(e.target);
+  }
+  return s;
+}
+
+function getAiSubNodes(
+  agentId: string,
+  edges: WorkflowCanvasEdge[],
+  nodes: WorkflowCanvasNode[],
+): AiAgentSubNodes {
   const result: AiAgentSubNodes = { chatModel: null, memory: null, tools: [] };
   for (const edge of edges) {
     if (edge.source !== agentId || edge.data?.kind !== "ai") continue;
     const role = edge.sourceHandle ? HANDLE_TO_ROLE[edge.sourceHandle] : undefined;
     if (!role) continue;
-    if (role === "tools") result.tools.push(edge.target);
-    else result[role] = edge.target;
+    if (role === "tools") continue;
+    result[role] = edge.target;
   }
+  result.tools = expandOrderedToolsFromAgent(agentId, edges, nodes);
   return result;
+}
+
+/** Grafo principal respeitando só o ramo IF escolhido em `ifBranchOutcome`. */
+function buildFilteredMainAdjacency(
+  nodes: WorkflowCanvasNode[],
+  edges: WorkflowCanvasEdge[],
+  mainNodeIds: Set<string>,
+): Map<string, string[]> {
+  const adjacency = new Map<string, string[]>();
+  for (const id of mainNodeIds) adjacency.set(id, []);
+
+  const nodeById = new Map(nodes.map((n) => [n.id, n]));
+
+  for (const edge of edges) {
+    if (edge.data?.kind === "ai") continue;
+    if (!mainNodeIds.has(edge.source) || !mainNodeIds.has(edge.target)) continue;
+    const src = nodeById.get(edge.source);
+    if (src?.data.templateId === "ifNode") {
+      const branch = src.data.ifBranchOutcome === "false" ? "false" : "true";
+      const wantHandle = branch === "true" ? IF_TRUE_HANDLE_ID : IF_FALSE_HANDLE_ID;
+      const h = edge.sourceHandle ?? IF_TRUE_HANDLE_ID;
+      if (h !== wantHandle) continue;
+    }
+    if (src?.data.templateId === "switchNode") {
+      const activeIdx = src.data.switchActiveOutput ?? 0;
+      const wantHandle = switchHandleId(activeIdx);
+      if ((edge.sourceHandle ?? "") !== wantHandle) continue;
+    }
+    adjacency.get(edge.source)!.push(edge.target);
+  }
+  return adjacency;
 }
 
 function mainTopologicalSort(
@@ -42,21 +90,23 @@ function mainTopologicalSort(
   edges: WorkflowCanvasEdge[],
   startNodeId?: string,
 ): string[] {
-  const mainNodes = nodes.filter((n) => !n.data.disabled && !AI_SUB_KINDS.has(n.data.kind));
-  const adjacency = new Map<string, string[]>();
-  const inDegree = new Map<string, number>();
+  const aiTargets = targetsOfAiEdges(edges);
+  const toolChainMembers = collectAgentToolChainNodeIds(edges, nodes);
+  const mainNodes = nodes.filter(
+    (n) =>
+      !n.data.disabled &&
+      !AI_SUB_KINDS.has(n.data.kind) &&
+      !aiTargets.has(n.id) &&
+      !toolChainMembers.has(n.id),
+  );
   const nodeIds = new Set(mainNodes.map((n) => n.id));
-
-  for (const id of nodeIds) {
-    adjacency.set(id, []);
-    inDegree.set(id, 0);
-  }
-
-  for (const edge of edges) {
-    if (edge.data?.kind === "ai") continue;
-    if (!nodeIds.has(edge.source) || !nodeIds.has(edge.target)) continue;
-    adjacency.get(edge.source)!.push(edge.target);
-    inDegree.set(edge.target, (inDegree.get(edge.target) ?? 0) + 1);
+  const adjacency = buildFilteredMainAdjacency(nodes, edges, nodeIds);
+  const inDegree = new Map<string, number>();
+  for (const id of nodeIds) inDegree.set(id, 0);
+  for (const [, targets] of adjacency) {
+    for (const t of targets) {
+      inDegree.set(t, (inDegree.get(t) ?? 0) + 1);
+    }
   }
 
   const queue: string[] = [];
@@ -66,17 +116,17 @@ function mainTopologicalSort(
     for (const [id, deg] of inDegree) {
       if (deg === 0) queue.push(id);
     }
+    queue.sort();
   }
 
   const result: string[] = [];
-  const visited = new Set<string>();
   while (queue.length > 0) {
+    queue.sort();
     const current = queue.shift()!;
-    if (visited.has(current)) continue;
-    visited.add(current);
     result.push(current);
     for (const neighbor of adjacency.get(current) ?? []) {
-      if (!visited.has(neighbor)) queue.push(neighbor);
+      inDegree.set(neighbor, (inDegree.get(neighbor) ?? 0) - 1);
+      if (inDegree.get(neighbor) === 0) queue.push(neighbor);
     }
   }
   return result;
@@ -119,11 +169,11 @@ export function useWorkflowExecution({
     [setNodes],
   );
 
-  const updateEdgesForNode = useCallback(
-    (nodeId: string, state: NodeVisualState) => {
+  const setEdgeState = useCallback(
+    (filter: (e: WorkflowCanvasEdge) => boolean, state: NodeVisualState) => {
       setEdges((eds) =>
         eds.map((e) => {
-          if (e.target === nodeId || e.source === nodeId) {
+          if (filter(e)) {
             const base = (e.className ?? "").replace(/workflow-edge--(running|success|error)/g, "").trim();
             return { ...e, data: { kind: e.data!.kind, visualState: state }, className: `${base} workflow-edge--${state}` } as WorkflowCanvasEdge;
           }
@@ -134,6 +184,18 @@ export function useWorkflowExecution({
     [setEdges],
   );
 
+  const markIncomingEdges = useCallback(
+    (nodeId: string, state: NodeVisualState) =>
+      setEdgeState((e) => e.target === nodeId, state),
+    [setEdgeState],
+  );
+
+  const markOutgoingEdges = useCallback(
+    (nodeId: string, state: NodeVisualState) =>
+      setEdgeState((e) => e.source === nodeId, state),
+    [setEdgeState],
+  );
+
   const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
   const shouldError = useCallback((nodeId: string): boolean => {
@@ -141,29 +203,47 @@ export function useWorkflowExecution({
     return node?.data.simulateError === true;
   }, []);
 
+  const EDGE_TRAVEL_MS = 350;
+
   const runNode = useCallback(
     async (nodeId: string, delayMs = NODE_DELAY_MS): Promise<boolean> => {
       if (cancelRef.current) return false;
+
+      markIncomingEdges(nodeId, "running");
+      await delay(EDGE_TRAVEL_MS);
+      if (cancelRef.current) return false;
+
       updateNodeState(nodeId, "running");
-      updateEdgesForNode(nodeId, "running");
       await delay(delayMs);
       if (cancelRef.current) return false;
 
       const hasError = shouldError(nodeId);
       const finalState: NodeVisualState = hasError ? "error" : "success";
       updateNodeState(nodeId, finalState);
-      updateEdgesForNode(nodeId, finalState);
+      markIncomingEdges(nodeId, finalState);
+
+      if (!hasError) {
+        await delay(200);
+        if (cancelRef.current) return false;
+        markOutgoingEdges(nodeId, "running");
+        await delay(EDGE_TRAVEL_MS);
+        if (cancelRef.current) return false;
+      }
+
       return !hasError;
     },
-    [updateNodeState, updateEdgesForNode, shouldError],
+    [updateNodeState, markIncomingEdges, markOutgoingEdges, shouldError],
   );
 
   const runAiAgentSubRoutine = useCallback(
     async (agentId: string): Promise<boolean> => {
-      const sub = getAiSubNodes(agentId, edgesRef.current);
+      const sub = getAiSubNodes(agentId, edgesRef.current, nodesRef.current);
+
+      markIncomingEdges(agentId, "running");
+      await delay(EDGE_TRAVEL_MS);
+      if (cancelRef.current) return false;
 
       updateNodeState(agentId, "running");
-      updateEdgesForNode(agentId, "running");
       await delay(300);
 
       if (sub.chatModel) {
@@ -187,10 +267,18 @@ export function useWorkflowExecution({
       const hasError = shouldError(agentId);
       const finalState: NodeVisualState = hasError ? "error" : "success";
       updateNodeState(agentId, finalState);
-      updateEdgesForNode(agentId, finalState);
+      markIncomingEdges(agentId, finalState);
+
+      if (!hasError) {
+        await delay(200);
+        if (cancelRef.current) return false;
+        markOutgoingEdges(agentId, "running");
+        await delay(EDGE_TRAVEL_MS);
+      }
+
       return !hasError;
     },
-    [updateNodeState, updateEdgesForNode, runNode, shouldError],
+    [updateNodeState, markIncomingEdges, markOutgoingEdges, runNode, shouldError],
   );
 
   const startExecution = useCallback(

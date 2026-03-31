@@ -21,11 +21,16 @@ export type WorkflowNodeData = {
   disabled?: boolean;
   simulateError?: boolean;
   outputLabel?: string;
+  /** Nó IF: ramo que a execução segue (`true` = porta “Verdadeiro”). */
+  ifBranchOutcome?: "true" | "false";
+  switchOutputCount?: number;
+  switchOutputLabels?: string[];
+  switchActiveOutput?: number;
   onDelete?: (nodeId: string) => void;
   onDisable?: (nodeId: string) => void;
   onRun?: () => void;
   onExecuteWorkflow?: () => void;
-  onPlusClick?: (nodeId: string, subportCategory?: string) => void;
+  onPlusClick?: (nodeId: string, subportCategory?: string, sourceHandleId?: string) => void;
 };
 
 export type WorkflowEdgeData = {

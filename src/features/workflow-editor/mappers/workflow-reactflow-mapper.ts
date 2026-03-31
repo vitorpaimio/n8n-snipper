@@ -10,6 +10,7 @@ import {
   type WorkflowNode,
 } from "@/workflow-kit";
 
+import { AI_SUB_TOP_TARGET_HANDLE } from "../agent-tool-subgraph";
 import type { WorkflowCanvasEdge, WorkflowCanvasNode } from "../types";
 import { parseDescriptionToAction } from "../utils/node-subtitle";
 
@@ -79,6 +80,10 @@ export function buildNodeFromTemplate(
       description: template.description,
       kind: template.type,
       ...(parsed ? { actionKey: parsed.actionKey, actionValue: parsed.actionValue } : {}),
+      ...(templateId === "ifNode" ? { ifBranchOutcome: "true" as const } : {}),
+      ...(templateId === "switchNode"
+        ? { switchOutputCount: 2, switchOutputLabels: ["0", "1"], switchActiveOutput: 0 }
+        : {}),
     },
   };
 }
@@ -158,14 +163,20 @@ export function buildReferenceGraph(): {
 export function buildMainEdge({
   source,
   target,
+  sourceHandle,
+  targetHandle,
 }: {
   source: string;
   target: string;
+  sourceHandle?: string | null;
+  targetHandle?: string | null;
 }): WorkflowCanvasEdge {
   return edgeFromSnapshot({
     id: `edge-${source}-${target}-${Date.now()}`,
     source,
     target,
+    sourceHandle: sourceHandle ?? undefined,
+    targetHandle: targetHandle ?? undefined,
     kind: "main",
   });
 }
@@ -184,6 +195,7 @@ export function buildAiSubEdge({
     source,
     target,
     sourceHandle,
+    targetHandle: AI_SUB_TOP_TARGET_HANDLE,
     kind: "ai",
   });
 }

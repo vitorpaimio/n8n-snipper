@@ -1,12 +1,22 @@
 "use client";
 
-import { Handle, Position, useNodeConnections, type NodeProps } from "@xyflow/react";
-import { useCallback, useMemo, useRef, useState, type CSSProperties } from "react";
+import {
+  Handle,
+  Position,
+  useEdges,
+  useNodeConnections,
+  useNodes,
+  type NodeProps,
+} from "@xyflow/react";
+import React, { useCallback, useMemo, useRef, useState, type CSSProperties } from "react";
 
 import * as N8N from "@/workflow-kit/n8n-tokens";
 
+import { AI_SUB_TOP_TARGET_HANDLE, collectAgentToolChainNodeIds } from "../agent-tool-subgraph";
+import { IF_FALSE_HANDLE_ID, IF_TRUE_HANDLE_ID } from "../if-node";
 import { resolveTemplate } from "../mappers/workflow-reactflow-mapper";
-import type { WorkflowCanvasNode, WorkflowNodeData } from "../types";
+import { SWITCH_DEFAULT_OUTPUT_COUNT, switchHandleId } from "../switch-node";
+import type { WorkflowCanvasEdge, WorkflowCanvasNode, WorkflowNodeData } from "../types";
 import { getWorkflowNodeSubtitle } from "../utils/node-subtitle";
 import type { NodeVisualState } from "../types";
 
@@ -173,10 +183,11 @@ function AgentSubPlus({ onClick }: { onClick?: () => void }) {
   );
 }
 
-function HandlePlus({ onClick, label, className }: { onClick?: () => void; label?: string; className?: string }) {
+function HandlePlus({ onClick, label, className, style }: { onClick?: () => void; label?: string; className?: string; style?: CSSProperties }) {
   return (
     <div
       className={["workflow-handle-plus", className].filter(Boolean).join(" ")}
+      style={style}
       onClick={(e) => { e.stopPropagation(); onClick?.(); }}
       onDoubleClick={(e) => e.stopPropagation()}
       role="button"
@@ -184,12 +195,18 @@ function HandlePlus({ onClick, label, className }: { onClick?: () => void; label
       title="Adicionar nó conectado"
     >
       {label && <span className="workflow-handle-plus-label">{label}</span>}
-      <svg width="62" height="28" viewBox="0 0 62 28">
-        <line x1="0" y1="14" x2="36" y2="14" stroke="rgba(255,255,255,0.22)" strokeWidth="2.5" />
-        <rect x="34" y="2" width="24" height="24" rx="6" fill="var(--n8n-surface-alt)" stroke="rgba(255,255,255,0.18)" strokeWidth="1.5" className="workflow-handle-plus-rect" />
-        <path d="M42 14h8M46 10v8" stroke="var(--n8n-text-muted)" strokeWidth="2" strokeLinecap="round" />
-      </svg>
+      <BranchPlusSvg />
     </div>
+  );
+}
+
+function BranchPlusSvg() {
+  return (
+    <svg width="62" height="28" viewBox="0 0 62 28">
+      <line x1="0" y1="14" x2="36" y2="14" stroke="rgba(255,255,255,0.22)" strokeWidth="2" />
+      <rect x="34" y="2" width="24" height="24" rx="6" fill="var(--n8n-surface-alt)" stroke="rgba(255,255,255,0.18)" strokeWidth="1.5" className="workflow-branch-plus-rect" />
+      <path d="M42 14h8M46 10v8" stroke="var(--n8n-text-muted)" strokeWidth="2" strokeLinecap="round" />
+    </svg>
   );
 }
 
@@ -237,9 +254,60 @@ export function WorkflowNodeCard({ data, selected, id }: NodeProps<WorkflowCanva
 
   const isTrigger = data.kind === "trigger";
   const isAiAgent = data.templateId === "aiAgent";
+  const isIfNode = data.templateId === "ifNode";
+  const isSwitchNode = data.templateId === "switchNode";
+  const isMultiOutput = isIfNode || isSwitchNode;
   const isAiSubNode = data.kind === "chatModel" || data.kind === "memory" || data.kind === "tool";
+
+  const switchCount = data.switchOutputCount ?? SWITCH_DEFAULT_OUTPUT_COUNT;
+  const switchLabels = data.switchOutputLabels ?? [];
+  const switchCardHeight = isSwitchNode && switchCount > 2
+    ? Math.round(100 + (switchCount - 2) * 30.6)
+    : undefined;
+
+  const ifLabelWidth = isIfNode ? Math.max("false".length * 6.6 + 2, 12) : undefined;
+
+  const switchLabelWidth = useMemo(() => {
+    if (!isSwitchNode) return undefined;
+    let maxLen = 0;
+    for (let i = 0; i < switchCount; i++) {
+      const l = switchLabels[i] ?? String(i);
+      const truncated = l.length > 9 ? 10 : l.length;
+      if (truncated > maxLen) maxLen = truncated;
+    }
+    return Math.max(maxLen * 6.6 + 2, 12);
+  }, [isSwitchNode, switchCount, switchLabels]);
+  const edges = useEdges();
+  const nodes = useNodes<WorkflowCanvasNode>();
+  const hasIncomingAiEdge = useMemo(
+    () =>
+      edges.some(
+        (e) => e.target === id && !!e.data && "kind" in e.data && e.data.kind === "ai",
+      ),
+    [edges, id],
+  );
+  const toolSubgraphIds = useMemo(
+    () => collectAgentToolChainNodeIds(edges as WorkflowCanvasEdge[], nodes),
+    [edges, nodes],
+  );
+  /** Apps da categoria “tool” (WhatsApp, etc.) usam kind do template (ex.: communication), mas ligam por aresta ai; cadeia tool→tool segue arestas main. */
+  const renderAsAiSub = isAiSubNode || hasIncomingAiEdge || toolSubgraphIds.has(id);
+  /** Tools sob o agente são folhas: só entrada (topo), sem porta de saída. Chat Model / Memory continuam com saída. */
+  const isAgentToolPortLeaf =
+    data.kind === "tool" ||
+    (toolSubgraphIds.has(id) && data.kind !== "chatModel" && data.kind !== "memory");
   const sourceConnections = useNodeConnections({ handleType: "source" });
+  const ifTrueConnections = useNodeConnections({ handleType: "source", handleId: IF_TRUE_HANDLE_ID });
+  const ifFalseConnections = useNodeConnections({ handleType: "source", handleId: IF_FALSE_HANDLE_ID });
   const hasOutgoingEdge = sourceConnections.length > 0;
+
+  const connectedSwitchHandles = useMemo(() => {
+    const set = new Set<string>();
+    for (const conn of sourceConnections) {
+      if (conn.sourceHandle?.startsWith("switch-")) set.add(conn.sourceHandle);
+    }
+    return set;
+  }, [sourceConnections]);
 
   const connectedSubports = useMemo(() => {
     const set = new Set<string>();
@@ -260,7 +328,7 @@ export function WorkflowNodeCard({ data, selected, id }: NodeProps<WorkflowCanva
     };
   }, [isAiAgent]);
 
-  if (isAiSubNode) {
+  if (renderAsAiSub) {
     return (
       <div
         className="workflow-node-shell workflow-node-shell--ai-sub"
@@ -280,13 +348,29 @@ export function WorkflowNodeCard({ data, selected, id }: NodeProps<WorkflowCanva
         />
         <div className="workflow-node-card workflow-node-card--ai-sub">
           <Handle
-            className="workflow-handle workflow-handle--ai-sub-target"
+            className="workflow-handle workflow-handle--target workflow-handle--ai-sub-target"
             type="target"
             position={Position.Top}
+            id={AI_SUB_TOP_TARGET_HANDLE}
           />
           <div className="workflow-node-card-icon">
             {Icon ? <Icon className="workflow-node-card-icon-svg" /> : null}
           </div>
+          {!isAgentToolPortLeaf ? (
+            <>
+              <Handle
+                className="workflow-handle workflow-handle--source workflow-handle--ai-sub-source"
+                type="source"
+                position={Position.Right}
+              />
+              {data.outputLabel && hasOutgoingEdge ? (
+                <span className="workflow-handle-output-label">{data.outputLabel}</span>
+              ) : null}
+              {!hasOutgoingEdge ? (
+                <HandlePlus onClick={() => data.onPlusClick?.(id)} label={data.outputLabel} />
+              ) : null}
+            </>
+          ) : null}
           <ExecutionBadge state={executionState} />
         </div>
         <div className="workflow-node-meta">
@@ -310,8 +394,8 @@ export function WorkflowNodeCard({ data, selected, id }: NodeProps<WorkflowCanva
       onMouseLeave={handleMouseLeave}
     >
       <div
-        className={`workflow-node-card${isTrigger ? " workflow-node-card--trigger" : ""}${isAiAgent ? " workflow-node-card--ai-agent" : ""}`}
-        style={isAiAgent ? undefined : { borderRadius: getBorderRadius(data.kind) }}
+        className={`workflow-node-card${isTrigger ? " workflow-node-card--trigger" : ""}${isAiAgent ? " workflow-node-card--ai-agent" : ""}${isIfNode ? " workflow-node-card--if" : ""}${isSwitchNode ? " workflow-node-card--switch" : ""}`}
+        style={isAiAgent ? undefined : { borderRadius: getBorderRadius(data.kind), ...(switchCardHeight ? { height: switchCardHeight } : {}) }}
       >
         {isTrigger && <TriggerPanel onExecute={data.onExecuteWorkflow} />}
         <NodeToolbar
@@ -330,16 +414,18 @@ export function WorkflowNodeCard({ data, selected, id }: NodeProps<WorkflowCanva
             style={mainHandleTopStyle}
           />
         )}
-        <Handle
-          className={`workflow-handle workflow-handle--source${isTrigger ? " workflow-handle--trigger" : ""}`}
-          type="source"
-          position={Position.Right}
-          style={mainHandleTopStyle}
-        />
-        {data.outputLabel && hasOutgoingEdge && (
+        {!isMultiOutput && (
+          <Handle
+            className={`workflow-handle workflow-handle--source${isTrigger ? " workflow-handle--trigger" : ""}`}
+            type="source"
+            position={Position.Right}
+            style={mainHandleTopStyle}
+          />
+        )}
+        {!isMultiOutput && data.outputLabel && hasOutgoingEdge && (
           <span className="workflow-handle-output-label">{data.outputLabel}</span>
         )}
-        {!hasOutgoingEdge && (
+        {!isMultiOutput && !hasOutgoingEdge && (
           <HandlePlus
             onClick={() => data.onPlusClick?.(id)}
             label={data.outputLabel}
@@ -369,11 +455,103 @@ export function WorkflowNodeCard({ data, selected, id }: NodeProps<WorkflowCanva
               ))}
             </div>
           </>
+        ) : isIfNode ? (
+          <div className="workflow-node-card-icon">
+            {Icon ? <Icon className="workflow-node-card-icon-svg" /> : null}
+          </div>
+        ) : isSwitchNode ? (
+          <div className="workflow-node-card-icon">
+            {Icon ? <Icon className="workflow-node-card-icon-svg" /> : null}
+          </div>
         ) : (
           <div className="workflow-node-card-icon">
             {Icon ? <Icon className="workflow-node-card-icon-svg" /> : null}
           </div>
         )}
+        {isIfNode ? (
+          <>
+            <Handle
+              className="workflow-handle workflow-handle--source workflow-handle--if-true"
+              type="source"
+              position={Position.Right}
+              id={IF_TRUE_HANDLE_ID}
+            />
+            <div className="workflow-switch-output" style={{ top: "25%" }}>
+              <span className="workflow-switch-output-label" style={{ width: ifLabelWidth }}>true</span>
+              {ifTrueConnections.length === 0 ? (
+                <div
+                  className="workflow-switch-output-plus"
+                  onClick={(e) => { e.stopPropagation(); data.onPlusClick?.(id, undefined, IF_TRUE_HANDLE_ID); }}
+                  onDoubleClick={(e) => e.stopPropagation()}
+                  role="button"
+                  tabIndex={-1}
+                  title="Adicionar nó conectado"
+                >
+                  <BranchPlusSvg />
+                </div>
+              ) : null}
+            </div>
+            <Handle
+              className="workflow-handle workflow-handle--source workflow-handle--if-false"
+              type="source"
+              position={Position.Right}
+              id={IF_FALSE_HANDLE_ID}
+            />
+            <div className="workflow-switch-output" style={{ top: "75%" }}>
+              <span className="workflow-switch-output-label" style={{ width: ifLabelWidth }}>false</span>
+              {ifFalseConnections.length === 0 ? (
+                <div
+                  className="workflow-switch-output-plus"
+                  onClick={(e) => { e.stopPropagation(); data.onPlusClick?.(id, undefined, IF_FALSE_HANDLE_ID); }}
+                  onDoubleClick={(e) => e.stopPropagation()}
+                  role="button"
+                  tabIndex={-1}
+                  title="Adicionar nó conectado"
+                >
+                  <BranchPlusSvg />
+                </div>
+              ) : null}
+            </div>
+          </>
+        ) : null}
+        {isSwitchNode ? (
+          <>
+            {Array.from({ length: switchCount }, (_, i) => {
+              const hId = switchHandleId(i);
+              const pct = ((i + 1) / (switchCount + 1)) * 100;
+              const label = switchLabels[i] ?? String(i);
+              const hasConn = connectedSwitchHandles.has(hId);
+              return (
+                <React.Fragment key={hId}>
+                  <Handle
+                    className="workflow-handle workflow-handle--source workflow-handle--switch"
+                    type="source"
+                    position={Position.Right}
+                    id={hId}
+                    style={{ top: `${pct}%` }}
+                  />
+                  <div className="workflow-switch-output" style={{ top: `${pct}%` }}>
+                    <span className="workflow-switch-output-label" style={{ width: switchLabelWidth }}>
+                      {label.length > 9 ? `${label.slice(0, 9)}…` : label}
+                    </span>
+                    {!hasConn ? (
+                      <div
+                        className="workflow-switch-output-plus"
+                        onClick={(e) => { e.stopPropagation(); data.onPlusClick?.(id, undefined, hId); }}
+                        onDoubleClick={(e) => e.stopPropagation()}
+                        role="button"
+                        tabIndex={-1}
+                        title="Adicionar nó conectado"
+                      >
+                        <BranchPlusSvg />
+                      </div>
+                    ) : null}
+                  </div>
+                </React.Fragment>
+              );
+            })}
+          </>
+        ) : null}
         <ExecutionBadge state={executionState} />
       </div>
 
