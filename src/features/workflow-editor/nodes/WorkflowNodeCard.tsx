@@ -292,10 +292,6 @@ export function WorkflowNodeCard({ data, selected, id }: NodeProps<WorkflowCanva
   );
   /** Apps da categoria “tool” (WhatsApp, etc.) usam kind do template (ex.: communication), mas ligam por aresta ai; cadeia tool→tool segue arestas main. */
   const renderAsAiSub = isAiSubNode || hasIncomingAiEdge || toolSubgraphIds.has(id);
-  /** Tools sob o agente são folhas: só entrada (topo), sem porta de saída. Chat Model / Memory continuam com saída. */
-  const isAgentToolPortLeaf =
-    data.kind === "tool" ||
-    (toolSubgraphIds.has(id) && data.kind !== "chatModel" && data.kind !== "memory");
   const sourceConnections = useNodeConnections({ handleType: "source" });
   const ifTrueConnections = useNodeConnections({ handleType: "source", handleId: IF_TRUE_HANDLE_ID });
   const ifFalseConnections = useNodeConnections({ handleType: "source", handleId: IF_FALSE_HANDLE_ID });
@@ -356,21 +352,6 @@ export function WorkflowNodeCard({ data, selected, id }: NodeProps<WorkflowCanva
           <div className="workflow-node-card-icon">
             {Icon ? <Icon className="workflow-node-card-icon-svg" /> : null}
           </div>
-          {!isAgentToolPortLeaf ? (
-            <>
-              <Handle
-                className="workflow-handle workflow-handle--source workflow-handle--ai-sub-source"
-                type="source"
-                position={Position.Right}
-              />
-              {data.outputLabel && hasOutgoingEdge ? (
-                <span className="workflow-handle-output-label">{data.outputLabel}</span>
-              ) : null}
-              {!hasOutgoingEdge ? (
-                <HandlePlus onClick={() => data.onPlusClick?.(id)} label={data.outputLabel} />
-              ) : null}
-            </>
-          ) : null}
           <ExecutionBadge state={executionState} />
         </div>
         <div className="workflow-node-meta">
