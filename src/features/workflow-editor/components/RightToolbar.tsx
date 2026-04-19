@@ -2,9 +2,11 @@
 
 type RightToolbarProps = {
   onOpenCreator: () => void;
+  onOpenAIGenerator: () => void;
+  aiPanelOpen: boolean;
 };
 
-export function RightToolbar({ onOpenCreator }: RightToolbarProps) {
+export function RightToolbar({ onOpenCreator, onOpenAIGenerator, aiPanelOpen }: RightToolbarProps) {
   return (
     <div className="wf-right-toolbar">
       <button className="wf-right-toolbar-btn" type="button" title="Adicionar nó" onClick={onOpenCreator}>
@@ -25,10 +27,14 @@ export function RightToolbar({ onOpenCreator }: RightToolbarProps) {
           <polyline points="14 2 14 8 20 8"/>
         </svg>
       </button>
-      <button className="wf-right-toolbar-btn" type="button" title="Painel lateral">
+      <button
+        className={`wf-right-toolbar-btn${aiPanelOpen ? " wf-right-toolbar-btn--active" : ""}`}
+        type="button"
+        title="Gerar com IA"
+        onClick={onOpenAIGenerator}
+      >
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
-          <line x1="15" y1="3" x2="15" y2="21"/>
+          <path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/>
         </svg>
       </button>
     </div>

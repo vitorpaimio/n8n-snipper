@@ -26,6 +26,7 @@ type NodeSnapshot = {
   switchOutputCount?: number;
   switchOutputLabels?: string[];
   switchActiveOutput?: number;
+  loopCount?: number;
   actionKey?: string;
   actionValue?: string;
 };
@@ -60,6 +61,9 @@ function nodeToSnapshot(n: WorkflowCanvasNode): NodeSnapshot {
           switchOutputLabels: n.data.switchOutputLabels ?? ["0", "1"],
           switchActiveOutput: n.data.switchActiveOutput ?? 0,
         }
+      : {}),
+    ...(n.data.templateId === "splitInBatches" && n.data.loopCount !== undefined
+      ? { loopCount: n.data.loopCount }
       : {}),
     ...(n.data.actionKey ? { actionKey: n.data.actionKey } : {}),
     ...(n.data.actionValue ? { actionValue: n.data.actionValue } : {}),
@@ -177,6 +181,9 @@ export function loadSession(): {
               switchOutputLabels: snap.switchOutputLabels ?? ["0", "1"],
               switchActiveOutput: snap.switchActiveOutput ?? 0,
             }
+          : {}),
+        ...(snap.templateId === "splitInBatches"
+          ? { loopCount: snap.loopCount ?? 3 }
           : {}),
         ...(snap.actionKey ? { actionKey: snap.actionKey } : {}),
         ...(snap.actionValue ? { actionValue: snap.actionValue } : {}),

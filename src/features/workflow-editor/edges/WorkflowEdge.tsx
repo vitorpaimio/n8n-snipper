@@ -4,12 +4,75 @@ import {
   BaseEdge,
   EdgeLabelRenderer,
   getBezierPath,
+  getSmoothStepPath,
+  Position,
   useReactFlow,
   type EdgeProps,
 } from "@xyflow/react";
 import { useState } from "react";
 
 import type { WorkflowCanvasEdge } from "../types";
+
+// ─── Edge routing constants (mirroring n8n's getEdgeRenderData) ─────────────
+const EDGE_PADDING_BOTTOM = 130;
+const EDGE_PADDING_X = 40;
+const EDGE_BORDER_RADIUS = 16;
+const HANDLE_SIZE = 20;
+
+function getEdgeRenderData(
+  sourceX: number,
+  sourceY: number,
+  sourcePosition: Position,
+  targetX: number,
+  targetY: number,
+  targetPosition: Position,
+  kind: string,
+): { paths: string[]; labelX: number; labelY: number } {
+  const isBackward = sourceX - HANDLE_SIZE > targetX;
+
+  // Forward connections or AI sub-edges → simple bezier
+  if (!isBackward || kind === "ai") {
+    const [path, labelX, labelY] = getBezierPath({
+      sourceX,
+      sourceY,
+      sourcePosition,
+      targetX,
+      targetY,
+      targetPosition,
+    });
+    return { paths: [path], labelX, labelY };
+  }
+
+  // Backward connections → two smooth-step segments that route below the nodes
+  const midX = (sourceX + targetX) / 2;
+  const midY = sourceY + EDGE_PADDING_BOTTOM;
+
+  const [path1] = getSmoothStepPath({
+    sourceX,
+    sourceY,
+    sourcePosition,
+    targetX: midX,
+    targetY: midY,
+    targetPosition: Position.Right,
+    borderRadius: EDGE_BORDER_RADIUS,
+    offset: EDGE_PADDING_X,
+  });
+
+  const [path2] = getSmoothStepPath({
+    sourceX: midX,
+    sourceY: midY,
+    sourcePosition: Position.Left,
+    targetX,
+    targetY,
+    targetPosition,
+    borderRadius: EDGE_BORDER_RADIUS,
+    offset: EDGE_PADDING_X,
+  });
+
+  return { paths: [path1, path2], labelX: midX, labelY: midY };
+}
+
+// ─── Component ──────────────────────────────────────────────────────────────
 
 export function WorkflowEdge({
   id,
@@ -28,34 +91,42 @@ export function WorkflowEdge({
   const { deleteElements } = useReactFlow();
   const [hovered, setHovered] = useState(false);
 
-  const [edgePath, labelX, labelY] = getBezierPath({
+  const { paths, labelX, labelY } = getEdgeRenderData(
     sourceX,
     sourceY,
+    sourcePosition,
     targetX,
     targetY,
-    sourcePosition,
     targetPosition,
-  });
+    data?.kind ?? "main",
+  );
 
   return (
     <>
-      <BaseEdge
-        id={id}
-        path={edgePath}
-        style={style}
-        markerEnd={markerEnd}
-        interactionWidth={20}
-      />
+      {/* Render each path segment */}
+      {paths.map((p, i) => (
+        <BaseEdge
+          key={i}
+          id={i === 0 ? id : `${id}-seg-${i}`}
+          path={p}
+          style={style}
+          markerEnd={i === paths.length - 1 ? markerEnd : undefined}
+          interactionWidth={20}
+        />
+      ))}
 
       {/* Invisible wider hit area for hover detection */}
-      <path
-        d={edgePath}
-        fill="none"
-        stroke="transparent"
-        strokeWidth={30}
-        onMouseEnter={() => setHovered(true)}
-        onMouseLeave={() => setHovered(false)}
-      />
+      {paths.map((p, i) => (
+        <path
+          key={`hit-${i}`}
+          d={p}
+          fill="none"
+          stroke="transparent"
+          strokeWidth={30}
+          onMouseEnter={() => setHovered(true)}
+          onMouseLeave={() => setHovered(false)}
+        />
+      ))}
 
       <EdgeLabelRenderer>
         <div

@@ -26,6 +26,7 @@ export type WorkflowNodeData = {
   switchOutputCount?: number;
   switchOutputLabels?: string[];
   switchActiveOutput?: number;
+  loopCount?: number;
   onDelete?: (nodeId: string) => void;
   onDisable?: (nodeId: string) => void;
   onRun?: () => void;

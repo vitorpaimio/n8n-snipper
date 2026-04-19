@@ -14,6 +14,7 @@ import * as N8N from "@/workflow-kit/n8n-tokens";
 
 import { AI_SUB_TOP_TARGET_HANDLE, collectAgentToolChainNodeIds } from "../agent-tool-subgraph";
 import { IF_FALSE_HANDLE_ID, IF_TRUE_HANDLE_ID } from "../if-node";
+import { LOOP_DONE_HANDLE_ID, LOOP_LOOP_HANDLE_ID } from "../loop-node";
 import { resolveTemplate } from "../mappers/workflow-reactflow-mapper";
 import { SWITCH_DEFAULT_OUTPUT_COUNT, switchHandleId } from "../switch-node";
 import type { WorkflowCanvasEdge, WorkflowCanvasNode, WorkflowNodeData } from "../types";
@@ -256,7 +257,8 @@ export function WorkflowNodeCard({ data, selected, id }: NodeProps<WorkflowCanva
   const isAiAgent = data.templateId === "aiAgent";
   const isIfNode = data.templateId === "ifNode";
   const isSwitchNode = data.templateId === "switchNode";
-  const isMultiOutput = isIfNode || isSwitchNode;
+  const isLoopNode = data.templateId === "splitInBatches";
+  const isMultiOutput = isIfNode || isSwitchNode || isLoopNode;
   const isAiSubNode = data.kind === "chatModel" || data.kind === "memory" || data.kind === "tool";
 
   const switchCount = data.switchOutputCount ?? SWITCH_DEFAULT_OUTPUT_COUNT;
@@ -295,6 +297,14 @@ export function WorkflowNodeCard({ data, selected, id }: NodeProps<WorkflowCanva
   const sourceConnections = useNodeConnections({ handleType: "source" });
   const ifTrueConnections = useNodeConnections({ handleType: "source", handleId: IF_TRUE_HANDLE_ID });
   const ifFalseConnections = useNodeConnections({ handleType: "source", handleId: IF_FALSE_HANDLE_ID });
+  const loopLoopHasConn = useMemo(
+    () => sourceConnections.some((c) => c.sourceHandle === LOOP_LOOP_HANDLE_ID),
+    [sourceConnections],
+  );
+  const loopDoneHasConn = useMemo(
+    () => sourceConnections.some((c) => c.sourceHandle === LOOP_DONE_HANDLE_ID),
+    [sourceConnections],
+  );
   const hasOutgoingEdge = sourceConnections.length > 0;
 
   const connectedSwitchHandles = useMemo(() => {
@@ -375,7 +385,7 @@ export function WorkflowNodeCard({ data, selected, id }: NodeProps<WorkflowCanva
       onMouseLeave={handleMouseLeave}
     >
       <div
-        className={`workflow-node-card${isTrigger ? " workflow-node-card--trigger" : ""}${isAiAgent ? " workflow-node-card--ai-agent" : ""}${isIfNode ? " workflow-node-card--if" : ""}${isSwitchNode ? " workflow-node-card--switch" : ""}`}
+        className={`workflow-node-card${isTrigger ? " workflow-node-card--trigger" : ""}${isAiAgent ? " workflow-node-card--ai-agent" : ""}${isIfNode ? " workflow-node-card--if" : ""}${isSwitchNode ? " workflow-node-card--switch" : ""}${isLoopNode ? " workflow-node-card--if" : ""}`}
         style={isAiAgent ? undefined : { borderRadius: getBorderRadius(data.kind), ...(switchCardHeight ? { height: switchCardHeight } : {}) }}
       >
         {isTrigger && <TriggerPanel onExecute={data.onExecuteWorkflow} />}
@@ -531,6 +541,52 @@ export function WorkflowNodeCard({ data, selected, id }: NodeProps<WorkflowCanva
                 </React.Fragment>
               );
             })}
+          </>
+        ) : null}
+        {isLoopNode ? (
+          <>
+            <Handle
+              className="workflow-handle workflow-handle--source workflow-handle--if-true"
+              type="source"
+              position={Position.Right}
+              id={LOOP_DONE_HANDLE_ID}
+            />
+            <div className="workflow-switch-output" style={{ top: "25%" }}>
+              <span className="workflow-switch-output-label">done</span>
+              {!loopDoneHasConn ? (
+                <div
+                  className="workflow-switch-output-plus"
+                  onClick={(e) => { e.stopPropagation(); data.onPlusClick?.(id, undefined, LOOP_DONE_HANDLE_ID); }}
+                  onDoubleClick={(e) => e.stopPropagation()}
+                  role="button"
+                  tabIndex={-1}
+                  title="Adicionar nó conectado"
+                >
+                  <BranchPlusSvg />
+                </div>
+              ) : null}
+            </div>
+            <Handle
+              className="workflow-handle workflow-handle--source workflow-handle--if-false"
+              type="source"
+              position={Position.Right}
+              id={LOOP_LOOP_HANDLE_ID}
+            />
+            <div className="workflow-switch-output" style={{ top: "75%" }}>
+              <span className="workflow-switch-output-label">loop</span>
+              {!loopLoopHasConn ? (
+                <div
+                  className="workflow-switch-output-plus"
+                  onClick={(e) => { e.stopPropagation(); data.onPlusClick?.(id, undefined, LOOP_LOOP_HANDLE_ID); }}
+                  onDoubleClick={(e) => e.stopPropagation()}
+                  role="button"
+                  tabIndex={-1}
+                  title="Adicionar nó conectado"
+                >
+                  <BranchPlusSvg />
+                </div>
+              ) : null}
+            </div>
           </>
         ) : null}
         <ExecutionBadge state={executionState} />

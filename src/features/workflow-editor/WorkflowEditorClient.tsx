@@ -20,6 +20,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } fr
 import * as N8N from "@/workflow-kit/n8n-tokens";
 import type { NodeTemplateId } from "@/workflow-kit";
 
+import { AIGeneratorPanel } from "./components/AIGeneratorPanel";
 import { RightToolbar } from "./components/RightToolbar";
 import { CanvasControls } from "./components/CanvasControls";
 import { CanvasEmptyState } from "./components/CanvasEmptyState";
@@ -55,7 +56,7 @@ const SAVE_DEBOUNCE_MS = 400;
 function WorkflowEditorInner() {
   const [nodes, setNodes, onNodesChange] = useNodesState<WorkflowCanvasNode>(EMPTY_NODES);
   const [edges, setEdges, onEdgesChange] = useEdgesState<WorkflowCanvasEdge>(EMPTY_EDGES);
-  const { deleteElements } = useReactFlow();
+  const { deleteElements, fitView } = useReactFlow();
 
   const hasRestoredRef = useRef(false);
 
@@ -81,6 +82,7 @@ function WorkflowEditorInner() {
   }, [nodes, edges]);
 
   const [creatorOpen, setCreatorOpen] = useState(false);
+  const [aiPanelOpen, setAiPanelOpen] = useState(false);
   const [creatorCategory, setCreatorCategory] = useState<import("@/workflow-kit").NodeCreatorCategoryId | undefined>(undefined);
   const [selectedTriggerId, setSelectedTriggerId] = useState<string | null>(null);
   const [connectFromNodeId, setConnectFromNodeId] = useState<string | null>(null);
@@ -237,6 +239,20 @@ function WorkflowEditorInner() {
     return () => window.removeEventListener("workflow:edge-plus", handleEdgePlus);
   }, []);
 
+  useEffect(() => {
+    function handleAIGenerated(e: Event) {
+      const { nodes: generatedNodes, edges: generatedEdges } = (e as CustomEvent).detail as {
+        nodes: WorkflowCanvasNode[];
+        edges: WorkflowCanvasEdge[];
+      };
+      setNodes(generatedNodes);
+      setEdges(generatedEdges);
+      setTimeout(() => fitView({ padding: 0.15, maxZoom: 1 }), 80);
+    }
+    window.addEventListener("workflow:load-ai-generated", handleAIGenerated);
+    return () => window.removeEventListener("workflow:load-ai-generated", handleAIGenerated);
+  }, [setNodes, setEdges, fitView]);
+
   const onDeleteSelected = useCallback(() => {
     const selectedNodes = nodes.filter((n) => n.selected);
     const selectedEdges = edges.filter((e) => e.selected);
@@ -273,6 +289,7 @@ function WorkflowEditorInner() {
         switchOutputCount?: number;
         switchOutputLabels?: string[];
         switchActiveOutput?: number;
+        loopCount?: number;
       },
     ) => {
       setNodes((nds) =>
@@ -300,6 +317,7 @@ function WorkflowEditorInner() {
               ...(patch.switchOutputCount !== undefined ? { switchOutputCount: patch.switchOutputCount } : {}),
               ...(patch.switchOutputLabels !== undefined ? { switchOutputLabels: patch.switchOutputLabels } : {}),
               ...(patch.switchActiveOutput !== undefined ? { switchActiveOutput: patch.switchActiveOutput } : {}),
+              ...(patch.loopCount !== undefined ? { loopCount: patch.loopCount } : {}),
             },
           };
         }),
@@ -446,7 +464,7 @@ function WorkflowEditorInner() {
             {nodes.length > 0 ? (
               <ExecuteWorkflowBar
                 isRunning={isRunning}
-                onExecute={() => startExecution()}
+                onExecute={() => startExecution(selectedTriggerId ?? triggerNodes[0]?.id)}
                 onStop={stopExecution}
                 triggers={triggerNodes}
                 selectedTriggerId={selectedTriggerId ?? triggerNodes[0]?.id ?? null}
@@ -454,7 +472,15 @@ function WorkflowEditorInner() {
               />
             ) : null}
 
-            <RightToolbar onOpenCreator={() => setCreatorOpen(true)} />
+            <RightToolbar
+              onOpenCreator={() => setCreatorOpen(true)}
+              onOpenAIGenerator={() => setAiPanelOpen((v) => !v)}
+              aiPanelOpen={aiPanelOpen}
+            />
+
+            {aiPanelOpen ? (
+              <AIGeneratorPanel onClose={() => setAiPanelOpen(false)} />
+            ) : null}
 
             <NodeEditModal
               open={editModalNodeId !== null && editModalNode !== null}

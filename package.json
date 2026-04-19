@@ -9,10 +9,12 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.90.0",
     "@xyflow/react": "latest",
     "clsx": "latest",
     "lucide-react": "latest",
     "next": "latest",
+    "openai": "^6.34.0",
     "react": "latest",
     "react-dom": "latest",
     "react-icons": "latest",

@@ -25,6 +25,7 @@
   --n8n-handle-hover: rgba(255, 255, 255, 0.46);
   --n8n-handle-connecting: #ff6d5a;
   --n8n-handle-valid: #3dd68c;
+  --n8n-accent: #ff6d5a;
   --n8n-trigger-rail: rgba(255, 109, 90, 0.35);
   /* Gatilho: raio à esquerda — espaçamento como n8n (spacing--sm + padding no .bolt) */
   --n8n-trigger-bolt-gap: 12px;
@@ -2487,4 +2488,187 @@ a {
 
 .workflow-reactflow .react-flow__controls {
   display: none !important;
+}
+
+/* ── AI Generator Panel ── */
+
+.wf-ai-panel {
+  position: absolute;
+  top: 8px;
+  right: 54px;
+  width: 320px;
+  background: var(--n8n-surface-alt);
+  border: 1px solid var(--n8n-border-subtle);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.wf-ai-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--n8n-border-subtle);
+  background: var(--n8n-surface);
+}
+
+.wf-ai-panel-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--n8n-text-primary);
+}
+
+.wf-ai-panel-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: none;
+  background: transparent;
+  color: var(--n8n-text-muted);
+  border-radius: 4px;
+  cursor: pointer;
+  padding: 0;
+  transition: color 120ms ease, background 120ms ease;
+}
+
+.wf-ai-panel-close:hover {
+  color: var(--n8n-text-primary);
+  background: var(--n8n-surface-hover);
+}
+
+.wf-ai-panel-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
+}
+
+.wf-ai-panel-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.wf-ai-panel-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--n8n-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.wf-ai-provider-toggle {
+  display: flex;
+  gap: 4px;
+  background: var(--n8n-surface);
+  border: 1px solid var(--n8n-border-subtle);
+  border-radius: 6px;
+  padding: 3px;
+}
+
+.wf-ai-provider-btn {
+  flex: 1;
+  padding: 5px 8px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--n8n-text-muted);
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: color 120ms ease, background 120ms ease;
+}
+
+.wf-ai-provider-btn:hover {
+  color: var(--n8n-text-primary);
+  background: var(--n8n-surface-soft-overlay);
+}
+
+.wf-ai-provider-btn--active {
+  color: var(--n8n-text-primary);
+  background: var(--n8n-surface-hover);
+}
+
+.wf-ai-textarea {
+  width: 100%;
+  background: var(--n8n-surface);
+  border: 1px solid var(--n8n-border-subtle);
+  border-radius: 6px;
+  color: var(--n8n-text-primary);
+  font-size: 12px;
+  line-height: 1.5;
+  padding: 8px 10px;
+  resize: vertical;
+  outline: none;
+  font-family: inherit;
+  transition: border-color 120ms ease;
+  box-sizing: border-box;
+}
+
+.wf-ai-textarea:focus {
+  border-color: var(--n8n-border-strong);
+}
+
+.wf-ai-textarea::placeholder {
+  color: var(--n8n-text-muted);
+  opacity: 0.6;
+}
+
+.wf-ai-error {
+  font-size: 12px;
+  color: var(--n8n-state-error);
+  background: var(--n8n-state-error-soft);
+  border: 1px solid rgba(248, 93, 130, 0.3);
+  border-radius: 6px;
+  padding: 8px 10px;
+  line-height: 1.4;
+}
+
+.wf-ai-generate-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  padding: 9px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #fff;
+  background: var(--n8n-accent);
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: opacity 120ms ease;
+}
+
+.wf-ai-generate-btn:hover:not(:disabled) {
+  opacity: 0.88;
+}
+
+.wf-ai-generate-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+@keyframes wf-spin {
+  to { transform: rotate(360deg); }
+}
+
+.wf-ai-spin {
+  animation: wf-spin 0.8s linear infinite;
+}
+
+.wf-right-toolbar-btn--active {
+  color: var(--n8n-accent);
+  border-color: rgba(255, 109, 90, 0.4);
+  background: rgba(255, 109, 90, 0.1);
 }

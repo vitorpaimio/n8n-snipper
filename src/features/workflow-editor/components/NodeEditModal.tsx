@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 
+import { LOOP_DEFAULT_COUNT, LOOP_MAX_COUNT } from "../loop-node";
 import { SWITCH_DEFAULT_OUTPUT_COUNT, SWITCH_MAX_OUTPUTS, defaultSwitchLabels } from "../switch-node";
 import type { WorkflowCanvasNode } from "../types";
 import { parseDescriptionToAction, SUGGESTED_ACTION_KEYS } from "../utils/node-subtitle";
@@ -21,6 +22,7 @@ type NodeEditModalProps = {
       switchOutputCount?: number;
       switchOutputLabels?: string[];
       switchActiveOutput?: number;
+      loopCount?: number;
     },
   ) => void;
 };
@@ -106,6 +108,33 @@ export function NodeEditModal({ open, node, onClose, onUpdate }: NodeEditModalPr
             </>
           ) : null}
 
+          {node.data.templateId === "splitInBatches" ? (() => {
+            const count = node.data.loopCount ?? LOOP_DEFAULT_COUNT;
+            return (
+              <>
+                <span className="node-edit-modal-label">Iterações antes de finalizar</span>
+                <p className="node-edit-modal-hint">
+                  O nó executa N vezes pela saída "loop" antes de seguir para "done".
+                </p>
+                <div className="node-edit-modal-stepper">
+                  <button
+                    type="button"
+                    className="node-edit-modal-stepper-btn"
+                    disabled={count <= 1}
+                    onClick={() => onUpdate(node.id, { loopCount: Math.max(1, count - 1) })}
+                  >−</button>
+                  <span className="node-edit-modal-stepper-value">{count}</span>
+                  <button
+                    type="button"
+                    className="node-edit-modal-stepper-btn"
+                    disabled={count >= LOOP_MAX_COUNT}
+                    onClick={() => onUpdate(node.id, { loopCount: Math.min(LOOP_MAX_COUNT, count + 1) })}
+                  >+</button>
+                </div>
+              </>
+            );
+          })() : null}
+
           {node.data.templateId === "switchNode" ? (() => {
             const count = node.data.switchOutputCount ?? SWITCH_DEFAULT_OUTPUT_COUNT;
             const labels = node.data.switchOutputLabels ?? defaultSwitchLabels(count);
@@ -184,7 +213,7 @@ export function NodeEditModal({ open, node, onClose, onUpdate }: NodeEditModalPr
             );
           })() : null}
 
-          {node.data.templateId === "ifNode" || node.data.templateId === "switchNode" ? null : (
+          {node.data.templateId === "ifNode" || node.data.templateId === "switchNode" || node.data.templateId === "splitInBatches" ? null : (
             <>
               <label className="node-edit-modal-label" htmlFor={`nem-key-${node.id}`}>
                 Função — chave

@@ -1,6 +1,7 @@
 import { MarkerType, type Edge, type Node } from "@xyflow/react";
 
 import * as N8N from "@/workflow-kit/n8n-tokens";
+import { LOOP_DEFAULT_COUNT } from "../loop-node";
 import {
   allNodeTemplates,
   buildReferenceN8nScene,
@@ -84,6 +85,7 @@ export function buildNodeFromTemplate(
       ...(templateId === "switchNode"
         ? { switchOutputCount: 2, switchOutputLabels: ["0", "1"], switchActiveOutput: 0 }
         : {}),
+      ...(templateId === "splitInBatches" ? { loopCount: LOOP_DEFAULT_COUNT } : {}),
     },
   };
 }
@@ -215,8 +217,8 @@ export function edgeFromSnapshot(snap: EdgeSnapshot): WorkflowCanvasEdge {
     type: "workflowEdge",
     source: snap.source,
     target: snap.target,
-    ...(snap.sourceHandle ? { sourceHandle: snap.sourceHandle } : {}),
-    ...(snap.targetHandle ? { targetHandle: snap.targetHandle } : {}),
+    ...(snap.sourceHandle && snap.sourceHandle !== "null" ? { sourceHandle: snap.sourceHandle } : {}),
+    ...(snap.targetHandle && snap.targetHandle !== "null" ? { targetHandle: snap.targetHandle } : {}),
     className: `workflow-edge workflow-edge--${snap.kind}`,
     style: edgeKindToStyle(snap.kind),
     markerEnd: snap.kind === "main" ? MAIN_MARKER_END : undefined,
